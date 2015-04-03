@@ -93,7 +93,7 @@ start_link() ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-%%   erlang:process_flag(trap_exit, true),
+  erlang:process_flag(trap_exit, true),
   io:format("Store server succesefully started (~w)~n",[self()]),
   {ok, #state{
     items = maps:new(),
@@ -125,8 +125,8 @@ handle_call({order,Name},_From, State) ->
   {reply, result , State};
 
 handle_call(list, _From, State) ->
-%%   {reply, State#state.items, State};
-  {reply, State, State};
+  {reply, State#state.items, State};
+%%   {reply, State, State};
 
 handle_call(terminate, _From, _State) ->
   {stop, normal, ok, _State}.
@@ -139,8 +139,8 @@ handle_info(Msg, State) ->
   io:format("Unexpected message: ~p~n",[Msg]),
   {noreply, State}.
 
-terminate(normal,State) ->
-  io:format("Terminated the server ~n"),
+terminate(_Reason, _State) ->
+  io:format("ch1: terminating with reason ~s .~n",[_Reason]),
   ok.
 
 code_change(_OldSvn, State, _Extra) ->

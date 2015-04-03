@@ -4,15 +4,15 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created : 02. Apr 2015 23:49
+%%% Created : 03. Apr 2015 16:37
 %%%-------------------------------------------------------------------
--module(root_supervisor).
+-module(store_supervisor).
 -author("raethlo").
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, shutdown/0 ]).
+-export([start_link/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -22,9 +22,6 @@
 %%%===================================================================
 %%% API functions
 %%%===================================================================
-
-shutdown() ->
-  exit(normal).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -66,13 +63,13 @@ init([]) ->
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
   Restart = permanent,
-  Shutdown = infinity,
-  Type = supervisor,
+  Shutdown = 2000,
+  Type = worker,
 
-  StoreSupervisor = {store_supervisor, {store_supervisor, start_link, []},
-    Restart, Shutdown, Type, [store_supervisor]},
+  AChild = {store_server, {store_server, start_link, []},
+    Restart, Shutdown, Type, [store_server]},
 
-  {ok, {SupFlags, [StoreSupervisor]}}.
+  {ok, {SupFlags, [AChild]}}.
 
 %%%===================================================================
 %%% Internal functions

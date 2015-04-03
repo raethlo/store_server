@@ -13,10 +13,10 @@
 
 -behaviour(gen_server).
 
--record(order_state,{customer_contact, status, item}).
+-record(order_state,{customer_contact, status, items}).
 
 %% API
--export([start_link/2, status/1 ,cancel/1, show/1]).
+-export([start_link/2, status/1 ,cancel/1, show/1, price/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -51,8 +51,8 @@ pay(Pid, Amount) when is_number(Amount), Amount > 0 ->
 %% @end
 %%--------------------------------------------------------------------
 
-start_link(CustomerPid,Item) ->
-  gen_server:start_link(?MODULE, {CustomerPid, Item}, []).
+start_link(CustomerPid,Items) ->
+  gen_server:start_link(?MODULE, {CustomerPid, Items}, []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -72,17 +72,17 @@ start_link(CustomerPid,Item) ->
 -spec(init(Args :: term()) ->
   {ok, State :: #order_state{}} | {ok, State :: #order_state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init({Contact,Item}) ->
+init({Contact,Items}) ->
   erlang:process_flag(trap_exit, true),
   io:format("New order created at (~w)~n",[self()]),
-  {ok,#order_state{customer_contact = Contact, status=placed, item=Item}}.
+  {ok,#order_state{customer_contact = Contact, status=placed, items=Items}}.
 
 
 handle_call(status, _From, State) ->
   {reply, State#order_state.status, State};
 
 handle_call(show, _From, State) ->
-  {reply, {State#order_state.status,State#order_state.item}, State};
+  {reply, {State#order_state.status,State#order_state.items}, State};
 %%   {reply, State, State};
 
 handle_call(terminate, _From, _State) ->
@@ -97,11 +97,16 @@ handle_info(Msg, State) ->
   {noreply, State}.
 
 terminate(normal,State) ->
-  io:format("Order for ~s disappeared into the void ~n",[State#order_state.item#item.name]),
+  io:format("Order for ~s disappeared into the void ~n",[State#order_state.items]),
   ok.
 
 code_change(_OldSvn, State, _Extra) ->
   {ok, State}.
 
 %% PRIVATE FUNCTIONS
+
+price(Items) ->
+  Fun = fun(K,V,AccIn) -> AccIn + (K#item.price * V) end,
+  maps:fold(Fun,0,Items).
+
 
