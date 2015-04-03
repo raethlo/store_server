@@ -15,7 +15,7 @@
 
 %% API
 -export([start_link/0, add_item/5 ,add_item/6, find/2, order/2,
-        list/1, filter/2, close_shop/1, update_items/3, p_add_to_cart/4
+        list/1, filter/2, close_shop/1, add_to_shopping_cart/4
 ]).
 
 %% gen_server callbacks
@@ -45,8 +45,8 @@ add_item(Pid, Type, Name, Description, Price) when is_pid(Pid), is_atom(Type), i
 add_item(Pid, Type, Name, Description, Price, Amount) when is_pid(Pid), is_atom(Type), is_number(Price),is_integer(Amount), Amount > 0 ->
   gen_server:call(Pid, {add_item, Type ,Name,Description,Price,Amount}).
 
-add_to_shoping_cart(Pid,ClientPid,Item) ->
-  gen_server:call(Pid,{cart, ClientPid, Item}).
+add_to_shopping_cart(Pid, ClientPid, Item, Amount) when is_pid(Pid), is_pid(ClientPid), is_integer(Amount), Amount > 0->
+  gen_server:call(Pid,{cart, ClientPid, Item, Amount}).
 
 list(Pid) ->
   gen_server:call(Pid,list).
@@ -93,7 +93,7 @@ start_link() ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-  erlang:process_flag(trap_exit, true),
+%%   erlang:process_flag(trap_exit, true),
   io:format("Store server succesefully started (~w)~n",[self()]),
   {ok, #state{
     items = maps:new(),
@@ -105,9 +105,19 @@ handle_call({add_item,Type,Name,Description,Price,Amount},_From, State) ->
   NewItem = create_item(Type,Name,Description,Price),
 
   NewItems = update_items(NewItem,Amount,State#state.items),
-  NewState = #state{items=NewItems},
+  NewState = #state{items=NewItems,carts=State#state.carts},
 
   {reply, NewItem, NewState};
+
+handle_call({cart, ClientPid, Item, Amount}, _From, State) ->
+  OnStock = maps:get(Item,State#state.items,0) - Amount,
+  if OnStock >= 0 ->
+    NewItems = update_items(Item,-Amount,State#state.items),
+    NewCarts = p_add_to_cart(ClientPid, Item, Amount, State#state.carts),
+    {reply, ok, #state{items=NewItems,carts=NewCarts}};
+  true ->
+    {reply, {not_on_stock}, State}
+  end;
 
 handle_call({order,Name},_From, State) ->
 %%   spawn order monitor and set the coresponding order
@@ -115,7 +125,8 @@ handle_call({order,Name},_From, State) ->
   {reply, result , State};
 
 handle_call(list, _From, State) ->
-  {reply, State#state.items, State};
+%%   {reply, State#state.items, State};
+  {reply, State, State};
 
 handle_call(terminate, _From, _State) ->
   {stop, normal, ok, _State}.
@@ -151,7 +162,7 @@ update_items(Item,Amount,Items) ->
       maps:remove(Item, Items)
   end.
 
-p_add_to_cart(UserPid, Item, Amount, Carts) when is_integer(Amount),Amount > 0 ->
+p_add_to_cart(UserPid, Item, Amount, Carts) when is_integer(Amount), Amount > 0 ->
   Cart = maps:get(UserPid, Carts, nil),
   if Cart =:= nil ->
       p_add_to_cart(UserPid,Item,Amount, maps:put(UserPid, maps:new(), Carts));
