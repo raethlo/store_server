@@ -12,8 +12,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, add_item/4 ,add_item/5, find/2, order/2, pay/0,
-        list/1, close_shop/1
+-export([start_link/0, add_item/5 ,add_item/6, find/2, order/2,
+        list/1, filter/2, close_shop/1
 ]).
 
 %% gen_server callbacks
@@ -37,17 +37,20 @@
 %%%===================================================================
 
 
-add_item(Pid, Name, Description, Price) ->
-  add_item(Pid,Name,Description,Price,1).
+add_item(Pid, Type, Name, Description, Price) ->
+  add_item(Pid,Type, Name, Description, Price, 1).
 
-add_item(Pid, Name, Description, Price, Amount) when is_integer(Amount), Amount > 0 ->
-  gen_server:call(Pid, {add_item,Name,Description,Price,Amount}).
+add_item(Pid, Type, Name, Description, Price, Amount) when is_integer(Amount), Amount > 0 ->
+  gen_server:call(Pid, {add_item, Type ,Name,Description,Price,Amount}).
 
 list(Pid) ->
   gen_server:call(Pid,list).
 
 find(Pid, Name) ->
   gen_server:call(Pid, {find, Name}).
+
+filter(Pid,Type) ->
+  gen_server:call(Pid,{filter, Type}).
 
 order(Pid,Name) ->
   gen_server:call(Pid, {order, Name}).
@@ -92,9 +95,12 @@ init([]) ->
   }}.
 
 
-handle_call({add_item,Type,Name,Description,Price},_From, State) ->
+handle_call({add_item,Type,Name,Description,Price,Amount},_From, State) ->
   NewItem = create_item(Type,Name,Description,Price),
-  NewState = #state{items=maps:put(NewItem,1,State#state.items)},
+
+  NewItems = update_items(NewItem,Amount,State#state.items),
+  NewState = #state{items=NewItems},
+
   {reply, NewItem, NewState};
 
 handle_call({order,Name},_From, State) ->
@@ -102,7 +108,7 @@ handle_call({order,Name},_From, State) ->
   {reply, not_implemented, State};
 
 handle_call(list, _From, State) ->
-  {reply, maps:values(State#state.items), State};
+  {reply, State#state.items, State};
 
 handle_call(terminate, _From, _State) ->
   {stop, normal, ok, _State}.
@@ -126,3 +132,12 @@ code_change(_OldSvn, State, _Extra) ->
 
 create_item(Type,Name,Desc,Price) ->
   #item{type=Type ,name=Name,description=Desc,price=Price}.
+
+update_items(Item,Amount,Items) ->
+  CurrentAmount = maps:get(Item, Items, nil),
+  case CurrentAmount of
+    nil ->
+      maps:put(Item, Amount, Items);
+    N when is_integer(N) ->
+      maps:put(Item, CurrentAmount + Amount, Items)
+  end.
