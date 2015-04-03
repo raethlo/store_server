@@ -30,7 +30,8 @@
 
 -record(state, {
   items,
-  carts
+  carts,
+  orders
 }).
 
 
@@ -97,7 +98,8 @@ init([]) ->
   io:format("Store server succesefully started (~w)~n",[self()]),
   {ok, #state{
     items = maps:new(),
-    carts = maps:new()
+    carts = maps:new(),
+    orders = maps:new()
   }}.
 
 
@@ -105,7 +107,7 @@ handle_call({add_item,Type,Name,Description,Price,Amount},_From, State) ->
   NewItem = create_item(Type,Name,Description,Price),
 
   NewItems = update_items(NewItem,Amount,State#state.items),
-  NewState = #state{items=NewItems,carts=State#state.carts},
+  NewState = #state{items=NewItems,carts=State#state.carts,orders = State#state.orders},
 
   {reply, NewItem, NewState};
 
@@ -114,7 +116,7 @@ handle_call({cart, ClientPid, Item, Amount}, _From, State) ->
   if OnStock >= 0 ->
     NewItems = update_items(Item,-Amount,State#state.items),
     NewCarts = p_add_to_cart(ClientPid, Item, Amount, State#state.carts),
-    {reply, ok, #state{items=NewItems,carts=NewCarts}};
+    {reply, ok, #state{items=NewItems,carts=NewCarts,orders = State#state.orders}};
   true ->
     {reply, {not_on_stock}, State}
   end;
@@ -122,13 +124,24 @@ handle_call({cart, ClientPid, Item, Amount}, _From, State) ->
 handle_call({order, CustomerPid},_From, State) ->
 %%   spawn order monitor and set the coresponding order
   Empty = p_cart_empty(CustomerPid,State#state.carts),
+  io:format("Empty? ~s ~n",Empty),
   case Empty of
     true ->
-      {reply, "Your cart is empty, fill it in first plz", State};
+      {reply, {cart_empty, "Your cart is empty, fill it in first plz"}, State};
     false ->
-%%       OrderSupervisor = whereis(orders_supervisor),
-      Order = orders_supervisor:place_order(CustomerPid, State#state.items),
-      {reply, {ok, Order} , State}
+
+      OngoingOrder = maps:is_key(CustomerPid, State#state.orders),
+      case OngoingOrder of
+        true ->
+          {reply,{ongoing_order, maps:get(CustomerPid, State#state.orders)}, State};
+        false ->
+          Cart = maps:get(CustomerPid, State#state.carts),
+          OrderResult = orders_supervisor:place_order(CustomerPid, Cart),
+          {_ , Order} = OrderResult,
+          NewOrders = maps:put(CustomerPid, Order, State#state.orders),
+          NewState = #state{items = State#state.items, carts = State#state.carts, orders = NewOrders},
+          {reply, OrderResult , NewState}
+      end
   end;
 
 handle_call(list, _From, State) ->
