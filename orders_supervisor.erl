@@ -23,15 +23,8 @@
 %%% API functions
 %%%===================================================================
 
-place_order(CustomerPid, Items) ->
-%%   spawn an order_server child who will comunicate
-  Restart = temporary,
-  Shutdown = 2000,
-  Type = worker,
-
-  AChild = {orders_server, {orders_server, start_link, [{CustomerPid, Items}]},
-    Restart, Shutdown, Type, [orders_server]},
-  supervisor:start_child(self(), AChild).
+place_order(CustomerPid, Items) when is_pid(CustomerPid)->
+  supervisor:start_child(whereis(orders_supervisor), [CustomerPid, Items]).
 
 %%--------------------------------------------------------------------
 %% @doc
