@@ -4,15 +4,15 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created : 02. Apr 2015 23:49
+%%% Created : 03. Apr 2015 11:08
 %%%-------------------------------------------------------------------
--module(root_supervisor).
+-module(orders_supervisor).
 -author("raethlo").
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, shutdown/0 ]).
+-export([start_link/0,place_order/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -23,8 +23,15 @@
 %%% API functions
 %%%===================================================================
 
-shutdown() ->
-  exit(normal).
+place_order(Item) ->
+%%   spawn an order_server child who will comunicate
+  Restart = permanent,
+  Shutdown = 2000,
+  Type = worker,
+
+  AChild = {orders_server, {orders_server, start_link, Item},
+    Restart, Shutdown, Type, [orders_server]},
+  supervisor:start_child(self(),AChild).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -59,20 +66,21 @@ start_link() ->
   ignore |
   {error, Reason :: term()}).
 init([]) ->
-  RestartStrategy = one_for_one,
-  MaxRestarts = 10,
-  MaxSecondsBetweenRestarts = 60,
+  RestartStrategy = simple_one_for_one,
+  MaxRestarts = 1000,
+  MaxSecondsBetweenRestarts = 3600,
 
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
   Restart = permanent,
-  Shutdown = infinity,
-  Type = supervisor,
+  Shutdown = 2000,
+  Type = worker,
 
-  OrdersSupervisor = {orders_supervisor, {orders_supervisor, start_link, []},
-    Restart, Shutdown, Type, [orders_supervisor]},
+  AChild = {orders_server, {orders_server, start_link, []},
+    Restart, Shutdown, Type, [orders_server]},
 
-  {ok, {SupFlags, [OrdersSupervisor]}}.
+  io:format("Orders supervisor at (~w)~n",[self()]),
+  {ok, {SupFlags, [AChild]}}.
 
 %%%===================================================================
 %%% Internal functions
