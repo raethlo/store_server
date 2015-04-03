@@ -9,12 +9,14 @@
 -module(orders_server).
 -author("raethlo").
 
+-include_lib("records.hrl").
+
 -behaviour(gen_server).
 
--record(order_state,{status,item}).
+-record(order_state,{customer_contact, status, item}).
 
 %% API
--export([start_link/0, status/1 ,cancel/1]).
+-export([start_link/2, status/1 ,cancel/1, show/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -33,8 +35,14 @@
 status(Pid) ->
   gen_server:call(Pid,status).
 
+show(Pid) ->
+  gen_server:call(Pid,show).
+
 cancel(Pid) ->
   gen_server:call(Pid,terminate).
+
+pay(Pid, Amount) when is_number(Amount), Amount > 0 ->
+  gen_server:call(Pid,{pay,Amount}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -42,10 +50,9 @@ cancel(Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link() ->
-  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link() ->
-  gen_server:start_link(?MODULE, [], []).
+
+start_link(CustomerPid,Item) ->
+  gen_server:start_link(?MODULE, {CustomerPid, Item}, []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -65,14 +72,19 @@ start_link() ->
 -spec(init(Args :: term()) ->
   {ok, State :: #order_state{}} | {ok, State :: #order_state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init(Item) ->
+init({Contact,Item}) ->
   erlang:process_flag(trap_exit, true),
   io:format("New order created at (~w)~n",[self()]),
-  {ok,#order_state{status=placed,item=Item}}.
+  {ok,#order_state{customer_contact = Contact, status=placed, item=Item}}.
 
 
 handle_call(status, _From, State) ->
   {reply, State#order_state.status, State};
+
+handle_call(show, _From, State) ->
+  {reply, {State#order_state.status,State#order_state.item}, State};
+%%   {reply, State, State};
+
 handle_call(terminate, _From, _State) ->
   {stop, normal, ok, _State}.
 
@@ -85,7 +97,7 @@ handle_info(Msg, State) ->
   {noreply, State}.
 
 terminate(normal,State) ->
-  io:format("Terminated the server ~n"),
+  io:format("Order for ~s disappeared into the void ~n",[State#order_state.item#item.name]),
   ok.
 
 code_change(_OldSvn, State, _Extra) ->

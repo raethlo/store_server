@@ -9,11 +9,13 @@
 -module(store_server).
 -author("raethlo").
 
+-include_lib("records.hrl").
+
 -behaviour(gen_server).
 
 %% API
 -export([start_link/0, add_item/5 ,add_item/6, find/2, order/2,
-        list/1, filter/2, close_shop/1
+        list/1, filter/2, close_shop/1, update_items/3, p_add_to_cart/4
 ]).
 
 %% gen_server callbacks
@@ -28,20 +30,23 @@
 
 -record(state, {
   items,
-  orders
+  carts
 }).
--record(item,{ type, name, description="No dedcription provided.", price}).
+
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 
-add_item(Pid, Type, Name, Description, Price) ->
+add_item(Pid, Type, Name, Description, Price) when is_pid(Pid), is_atom(Type), is_number(Price)->
   add_item(Pid,Type, Name, Description, Price, 1).
 
-add_item(Pid, Type, Name, Description, Price, Amount) when is_integer(Amount), Amount > 0 ->
+add_item(Pid, Type, Name, Description, Price, Amount) when is_pid(Pid), is_atom(Type), is_number(Price),is_integer(Amount), Amount > 0 ->
   gen_server:call(Pid, {add_item, Type ,Name,Description,Price,Amount}).
+
+add_to_shoping_cart(Pid,ClientPid,Item) ->
+  gen_server:call(Pid,{cart, ClientPid, Item}).
 
 list(Pid) ->
   gen_server:call(Pid,list).
@@ -54,7 +59,6 @@ filter(Pid,Type) ->
 
 order(Pid,Name) ->
   gen_server:call(Pid, {order, Name}).
-
 
 close_shop(Pid) ->
   gen_server:call(Pid,terminate).
@@ -89,9 +93,11 @@ start_link() ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
+  erlang:process_flag(trap_exit, true),
   io:format("Store server succesefully started (~w)~n",[self()]),
   {ok, #state{
-    items = maps:new()
+    items = maps:new(),
+    carts = maps:new()
   }}.
 
 
@@ -105,7 +111,8 @@ handle_call({add_item,Type,Name,Description,Price,Amount},_From, State) ->
 
 handle_call({order,Name},_From, State) ->
 %%   spawn order monitor and set the coresponding order
-  {reply, not_implemented, State};
+
+  {reply, result , State};
 
 handle_call(list, _From, State) ->
   {reply, State#state.items, State};
@@ -138,6 +145,23 @@ update_items(Item,Amount,Items) ->
   case CurrentAmount of
     nil ->
       maps:put(Item, Amount, Items);
-    N when is_integer(N) ->
-      maps:put(Item, CurrentAmount + Amount, Items)
+    N when is_integer(N), (CurrentAmount + Amount) > 0 ->
+      maps:put(Item, CurrentAmount + Amount, Items);
+    N when is_integer(N), (CurrentAmount + Amount) =< 0 ->
+      maps:remove(Item, Items)
   end.
+
+p_add_to_cart(UserPid, Item, Amount, Carts) when is_integer(Amount),Amount > 0 ->
+  Cart = maps:get(UserPid, Carts, nil),
+  if Cart =:= nil ->
+      p_add_to_cart(UserPid,Item,Amount, maps:put(UserPid, maps:new(), Carts));
+    true ->
+      NewCart = update_items(Item, Amount, Cart),
+      maps:put(UserPid,NewCart,Carts)
+  end.
+
+p_cart_empty(UserPid,Carts) ->
+  maps:is_key(UserPid,Carts) andalso maps:get(UserPid,Carts) =/= maps:new().
+
+p_discard_cart(UserPid) ->
+  no.
