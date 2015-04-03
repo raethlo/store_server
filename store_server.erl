@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, add_item/4, find/2, order/2, pay/0,
+-export([start_link/0, add_item/4 ,add_item/5, find/2, order/2, pay/0,
         list/1, close_shop/1
 ]).
 
@@ -30,14 +30,18 @@
   items,
   orders
 }).
--record(item,{name, type, description="No dedcription provided.", price}).
+-record(item,{ type, name, description="No dedcription provided.", price}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
+
 add_item(Pid, Name, Description, Price) ->
-  gen_server:call(Pid, {add_item,Name,Description,Price}).
+  add_item(Pid,Name,Description,Price,1).
+
+add_item(Pid, Name, Description, Price, Amount) when is_integer(Amount), Amount > 0 ->
+  gen_server:call(Pid, {add_item,Name,Description,Price,Amount}).
 
 list(Pid) ->
   gen_server:call(Pid,list).
@@ -48,9 +52,6 @@ find(Pid, Name) ->
 order(Pid,Name) ->
   gen_server:call(Pid, {order, Name}).
 
-pay() ->
-%%
-  not_yet.
 
 close_shop(Pid) ->
   gen_server:call(Pid,terminate).
@@ -92,8 +93,8 @@ init([]) ->
 
 
 handle_call({add_item,Type,Name,Description,Price},_From, State) ->
-  NewItem = create_item(Name,Description,Price),
-  NewState = #state{items=maps:put(Name,NewItem,State#state.items)},
+  NewItem = create_item(Type,Name,Description,Price),
+  NewState = #state{items=maps:put(NewItem,1,State#state.items)},
   {reply, NewItem, NewState};
 
 handle_call({order,Name},_From, State) ->
@@ -123,5 +124,5 @@ code_change(_OldSvn, State, _Extra) ->
 
 %% PRIVATE FUNCTIONS
 
-create_item(Name,Desc,Price) ->
-  #item{name=Name,description=Desc,price=Price}.
+create_item(Type,Name,Desc,Price) ->
+  #item{type=Type ,name=Name,description=Desc,price=Price}.
