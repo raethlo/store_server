@@ -69,6 +69,7 @@ init([]) ->
   AChild = {store_server, {store_server, start_link, []},
     Restart, Shutdown, Type, [store_server]},
 
+  io:format("Store supervisor at (~w)~n",[self()]),
   {ok, {SupFlags, [AChild]}}.
 
 %%%===================================================================

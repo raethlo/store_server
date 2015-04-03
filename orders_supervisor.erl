@@ -12,7 +12,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0,place_order/2]).
+-export([start_link/0, place_order/2]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -23,15 +23,15 @@
 %%% API functions
 %%%===================================================================
 
-place_order(CustomerPid,Item) ->
+place_order(CustomerPid, Items) ->
 %%   spawn an order_server child who will comunicate
   Restart = temporary,
   Shutdown = 2000,
   Type = worker,
 
-  AChild = {now(), {orders_server, start_link, [CustomerPid, Item]},
+  AChild = {orders_server, {orders_server, start_link, [{CustomerPid, Items}]},
     Restart, Shutdown, Type, [orders_server]},
-  supervisor:start_child(self(),AChild).
+  supervisor:start_child(self(), AChild).
 
 %%--------------------------------------------------------------------
 %% @doc

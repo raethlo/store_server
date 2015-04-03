@@ -72,7 +72,11 @@ init([]) ->
   StoreSupervisor = {store_supervisor, {store_supervisor, start_link, []},
     Restart, Shutdown, Type, [store_supervisor]},
 
-  {ok, {SupFlags, [StoreSupervisor]}}.
+  OrdersSupervisor = {orders_supervisor, {orders_supervisor, start_link, []},
+    Restart, Shutdown, Type, [orders_supervisor]},
+
+  io:format("Root supervisor ready and all alive at (~w)~n",[self()]),
+  {ok, {SupFlags, [StoreSupervisor, OrdersSupervisor]}}.
 
 %%%===================================================================
 %%% Internal functions

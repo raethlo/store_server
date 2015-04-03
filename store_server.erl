@@ -15,7 +15,7 @@
 
 %% API
 -export([start_link/0, add_item/5 ,add_item/6, find/2, order/2,
-        list/1, filter/2, close_shop/1, add_to_shopping_cart/4
+        list/1, filter/2, close_shop/1, add_to_shopping_cart/4, p_cart_empty/2
 ]).
 
 %% gen_server callbacks
@@ -57,8 +57,8 @@ find(Pid, Name) ->
 filter(Pid,Type) ->
   gen_server:call(Pid,{filter, Type}).
 
-order(Pid,Name) ->
-  gen_server:call(Pid, {order, Name}).
+order(Pid,Customer) when is_pid(Pid), is_pid(Customer)->
+  gen_server:call(Pid, {order, Customer}).
 
 close_shop(Pid) ->
   gen_server:call(Pid,terminate).
@@ -119,14 +119,21 @@ handle_call({cart, ClientPid, Item, Amount}, _From, State) ->
     {reply, {not_on_stock}, State}
   end;
 
-handle_call({order,Name},_From, State) ->
+handle_call({order, CustomerPid},_From, State) ->
 %%   spawn order monitor and set the coresponding order
-
-  {reply, result , State};
+  Empty = p_cart_empty(CustomerPid,State#state.carts),
+  case Empty of
+    true ->
+      {reply, "Your cart is empty, fill it in first plz", State};
+    false ->
+%%       OrderSupervisor = whereis(orders_supervisor),
+      Order = orders_supervisor:place_order(CustomerPid, State#state.items),
+      {reply, {ok, Order} , State}
+  end;
 
 handle_call(list, _From, State) ->
-  {reply, State#state.items, State};
-%%   {reply, State, State};
+%%   {reply, State#state.items, State};
+  {reply, State, State};
 
 handle_call(terminate, _From, _State) ->
   {stop, normal, ok, _State}.
@@ -140,7 +147,7 @@ handle_info(Msg, State) ->
   {noreply, State}.
 
 terminate(_Reason, _State) ->
-  io:format("ch1: terminating with reason ~s .~n",[_Reason]),
+  io:format("Store server: terminating.~n"),
   ok.
 
 code_change(_OldSvn, State, _Extra) ->
@@ -172,7 +179,7 @@ p_add_to_cart(UserPid, Item, Amount, Carts) when is_integer(Amount), Amount > 0 
   end.
 
 p_cart_empty(UserPid,Carts) ->
-  maps:is_key(UserPid,Carts) andalso maps:get(UserPid,Carts) =/= maps:new().
+  maps:is_key(UserPid,Carts) andalso maps:get(UserPid,Carts) =:= maps:new().
 
-p_discard_cart(UserPid) ->
-  no.
+p_discard_cart(UserPid,Carts) ->
+  maps:delete(UserPid,Carts).

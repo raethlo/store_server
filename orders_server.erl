@@ -51,8 +51,8 @@ pay(Pid, Amount) when is_number(Amount), Amount > 0 ->
 %% @end
 %%--------------------------------------------------------------------
 
-start_link(CustomerPid,Items) ->
-  gen_server:start_link(?MODULE, {CustomerPid, Items}, []).
+start_link(CustomerPid, Items) ->
+  gen_server:start_link(?MODULE, [CustomerPid, Items], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -72,7 +72,7 @@ start_link(CustomerPid,Items) ->
 -spec(init(Args :: term()) ->
   {ok, State :: #order_state{}} | {ok, State :: #order_state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init({Contact,Items}) ->
+init([Contact,Items]) ->
   erlang:process_flag(trap_exit, true),
   io:format("New order created at (~w)~n",[self()]),
   {ok,#order_state{customer_contact = Contact, status=placed, items=Items}}.
